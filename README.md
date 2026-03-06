@@ -4,7 +4,8 @@ A Unity package designed to make refactoring and bulk asset removal less painful
 ![screenshot](guidreporter.png)
 
 ## Usage
-* In the Unity Package Manager, press `+` and `Install package from git URL...` > `https://github.com/Envision-Center/Unity-Guid-Reporter.git`
+* In the Unity Package Manager, press `+` and `Install package from git URL...`
+* Paste `https://github.com/Envision-Center/Unity-Guid-Reporter.git` and click `Install`
 * To open the editor window, navigate to Envision > Guid Reporter
 * Under `Asset Folder` input the (relative) path underneath the Assets folder with the assets you wish to find references to.
 * Click the `Grab Guids` button.
