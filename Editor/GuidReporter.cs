@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -14,8 +13,10 @@ namespace CollabXR
 {
 	public class GuidReporter : EditorWindow
 	{
-		public string path;
-		public string searchPath;
+		private const string DEBUG_LOG_HEADER = "<color=#aaaaff>[Guid Reporter]</color>";
+
+		public string path = "";
+		public string searchPath = "";
 		public string report;
 
 		private string pathFull;
@@ -34,9 +35,20 @@ namespace CollabXR
 		CancellationTokenSource cts;
 
 		int completion = 0;
+		private void OnEnable()
+		{
+			UpdateLabels();
+		}
+
+		private void UpdateLabels()
+		{
+			pathFull = Path.Combine("Assets/", path);
+			searchFull = Path.GetFullPath(Path.Combine(Application.dataPath, searchPath));
+		}
 
 		private void OnGUI()
 		{
+			GUILayout.BeginVertical();
 			//Finding GUIDs
 			GUILayout.Label("Enter a path underneath the Assets folder.");
 
@@ -44,7 +56,7 @@ namespace CollabXR
 			path = EditorGUILayout.TextField("Asset Folder:", path);
 			if (EditorGUI.EndChangeCheck())
 			{
-				pathFull = Path.Combine("Assets/", path);
+				UpdateLabels();
 			}
 			GUILayout.Label(pathFull);
 
@@ -63,7 +75,7 @@ namespace CollabXR
 			searchPath = EditorGUILayout.TextField("Folder to Search:", searchPath);
 			if (EditorGUI.EndChangeCheck())
 			{
-				searchFull = Path.GetFullPath(Path.Combine(Application.dataPath, searchPath));
+				UpdateLabels();
 			}
 			GUILayout.Label(searchFull);
 
@@ -84,12 +96,11 @@ namespace CollabXR
 
 			openFile = GUILayout.Toggle(openFile, "Open report when completed");
 
-			GUILayout.Label($"{referenceTask.Status.ToString()}... {completion}/{assetGuids.Count}");
+			float percent = (float)completion / (float)assetGuids.Count;
 			GUILayout.Label($"{writeStatus}");
-
-			//scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.MaxHeight(1000));
-			//report = EditorGUILayout.TextArea(report);
-			//EditorGUILayout.EndScrollView();
+			GUILayout.Label("");
+			EditorGUI.ProgressBar(GUILayoutUtility.GetLastRect(), percent, $"{referenceTask.Status.ToString()}... {completion}/{assetGuids.Count}");
+			GUILayout.EndVertical();
 		}
 
 		[MenuItem("Envision/Guid Reporter")]
@@ -117,18 +128,21 @@ namespace CollabXR
 			cts = new CancellationTokenSource();
 			completion = 0;
 			List<UniTask<string>> tasks = new List<UniTask<string>>();
+			IEnumerable<string> filesInPath = FindFilesInPath(searchFull, GetExtensionsToSearch(), pathFull);
+			Debug.Log($"{DEBUG_LOG_HEADER} Searching for {assetGuids.Count} GUIDs across {filesInPath.Count()} files.");
 			for (int i = 0; i < assetGuids.Count; i++)
 			{
 				string guid = assetGuids[i];
+				tasks.Add(SearchGuid(filesInPath, guid, AssetDatabase.GUIDToAssetPath(guid)));
+			}
+			
+			await foreach (var t in UniTask.WhenEach(tasks))
+			{
 				if (cts.IsCancellationRequested)
 				{
 					throw new OperationCanceledException();
 				}
-				tasks.Add(SearchGuid(guid, AssetDatabase.GUIDToAssetPath(guid)));
-			}
-			foreach (UniTask<string> task in tasks)
-			{
-				report += await task;
+				report += t.Result;
 			}
 
 			string writePath = Path.Combine(Directory.GetParent(Application.dataPath).ToString(), "report.txt");
@@ -138,7 +152,7 @@ namespace CollabXR
 				writeStatus = $"Report saved to {writePath}";
 				if (openFile)
 				{
-					Process.Start(writePath);
+					System.Diagnostics.Process.Start(writePath);
 				}
 			}
 			catch (Exception e)
@@ -147,16 +161,13 @@ namespace CollabXR
 			}
 		}
 
-		private async UniTask<string> SearchGuid(string guid, string path)
+		private async UniTask<string> SearchGuid(IEnumerable<string> files, string guid, string path)
 		{
 			await UniTask.SwitchToThreadPool();
 			string file_report = "";
 			List<string> results = new List<string>();
 
-			foreach (string extension in GetExtensionsToSearch())
-			{
-				results.AddRange(FindFilesContainingGuid(searchFull, guid, extension, pathFull));
-			}
+			results.AddRange(FindFilesContainingGuid(files, guid));
 
 			if (results.Count > 0)
 			{
@@ -167,25 +178,42 @@ namespace CollabXR
 			{
 				file_report += $"    {file}" + Environment.NewLine;
 			}
+			if (cts.IsCancellationRequested)
+			{
+				throw new OperationCanceledException();
+			}
 			completion++;
 			await UniTask.SwitchToMainThread();
 			Repaint();
 			return file_report;
 		}
 
-		private static string[] FindFilesContainingGuid(string folderPath, string guid, string extension, string exclude)
+		private static IEnumerable<string> FindFilesInPath(string folderPath, string[] extensions, string exclude)
 		{
-			if (!Directory.Exists(folderPath))
-				throw new DirectoryNotFoundException($"The folder path '{folderPath}' does not exist.");
-
-			return Directory
-				.EnumerateFiles(folderPath, "*" + extension, SearchOption.AllDirectories)
-				.Where(file => ShouldInclude(file, exclude))
-				.Where(file => File.ReadAllText(file).Contains(guid))
-				.ToArray();
+			try
+			{
+				Debug.Log($"{DEBUG_LOG_HEADER} Indexing files at {folderPath}");
+				if (!Directory.Exists(folderPath))
+					throw new DirectoryNotFoundException($"The folder path '{folderPath}' does not exist.");
+				return Directory
+					.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories)
+					.Where(file => extensions.Any(file.ToLower().EndsWith))
+					.Where(file => NotInPath(file, exclude));
+			}
+			catch(Exception e)
+			{
+				Debug.Log($"{DEBUG_LOG_HEADER}{e.Message}");
+				return new List<string>();
+			}
 		}
 
-		private static bool ShouldInclude(string file, string exclude)
+		private static IEnumerable<string> FindFilesContainingGuid(IEnumerable<string> files, string guid)
+		{
+			return files
+				.Where(file => File.ReadAllText(file).Contains(guid));
+		}
+
+		private static bool NotInPath(string file, string exclude)
 		{
 			string fileDirectory = Path.GetFullPath(Path.GetDirectoryName(file));
 			string excludeDirectory = Path.GetFullPath(exclude);
@@ -197,7 +225,7 @@ namespace CollabXR
 			return referenceTask.Status == UniTaskStatus.Pending;
 		}
 
-		private List<string> GetExtensionsToSearch()
+		private string[] GetExtensionsToSearch()
 		{
 			List<string> extensions = new List<string>();
 			for (int i = 0; i < filterOptions.Length; ++i)
@@ -208,7 +236,7 @@ namespace CollabXR
 					extensions.Add(filterOptions[i]);
 				}
 			}
-			return extensions;
+			return extensions.ToArray();
 		}
 	}
 }
