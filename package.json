@@ -1,6 +1,6 @@
 {
   "name": "edu.envision.guidreporter",
-  "version": "0.3.3",
+  "version": "1.0.0",
   "displayName": "Unity GUID Reporter",
   "description": "Unity editor tool for generating bulk dependency reports based on guids.",
   "unity": "6000.0",
