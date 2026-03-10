@@ -23,11 +23,13 @@ namespace CollabXR
 		private string searchFull;
 		private string writeStatus;
 
+		private bool excludeFolderAssets = true;
+
 		private bool openFile = true;
 
 		private bool inverseSearch = false;
 
-		private string[] filterOptions = new string[] { ".meta", ".prefab", ".asset", ".controller", ".anim" };
+		private string[] filterOptions = new string[] { ".meta", ".prefab", ".asset", ".unity", ".mat", ".controller", ".anim" };
 		private int filter = ~0;
 
 		private List<string> assetGuids = new List<string>();
@@ -96,6 +98,8 @@ namespace CollabXR
 			}
 			GUI.enabled = true;
 
+			excludeFolderAssets = GUILayout.Toggle(excludeFolderAssets, "Exclude .meta files for folder assets");
+
 			openFile = GUILayout.Toggle(openFile, "Open report when completed");
 
 			inverseSearch = GUILayout.Toggle(inverseSearch, "Inverse search: list GUIDs with zero references");
@@ -117,6 +121,10 @@ namespace CollabXR
 		{
 			completion = 0;
 			assetGuids = AssetDatabase.FindAssets("", new string[] { pathFull }).ToList();
+			if (excludeFolderAssets)
+			{
+				assetGuids.RemoveAll(guid => AssetDatabase.IsValidFolder(AssetDatabase.GUIDToAssetPath(guid)));
+			}
 		}
 
 		private async UniTask FindReferences()
@@ -201,7 +209,7 @@ namespace CollabXR
 			return file_report;
 		}
 
-		private static IEnumerable<string> FindFilesInPath(string folderPath, string[] extensions, string exclude)
+		private IEnumerable<string> FindFilesInPath(string folderPath, string[] extensions, string exclude)
 		{
 			try
 			{
@@ -211,6 +219,7 @@ namespace CollabXR
 				return Directory
 					.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories)
 					.Where(file => extensions.Any(file.ToLower().EndsWith))
+					.Where(file => !excludeFolderAssets || !File.ReadAllText(file).Contains("folderAsset: yes"))
 					.Where(file => NotInPath(file, exclude));
 			}
 			catch(Exception e)
@@ -220,7 +229,7 @@ namespace CollabXR
 			}
 		}
 
-		private static IEnumerable<string> FindFilesContainingGuid(IEnumerable<string> files, string guid)
+		private IEnumerable<string> FindFilesContainingGuid(IEnumerable<string> files, string guid)
 		{
 			return files
 				.Where(file => File.ReadAllText(file).Contains(guid));
