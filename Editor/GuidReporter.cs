@@ -25,6 +25,8 @@ namespace CollabXR
 
 		private bool openFile = true;
 
+		private bool inverseSearch = false;
+
 		private string[] filterOptions = new string[] { ".meta", ".prefab", ".asset", ".controller", ".anim" };
 		private int filter = ~0;
 
@@ -95,6 +97,8 @@ namespace CollabXR
 			GUI.enabled = true;
 
 			openFile = GUILayout.Toggle(openFile, "Open report when completed");
+
+			inverseSearch = GUILayout.Toggle(inverseSearch, "Inverse search: list GUIDs with zero references");
 
 			float percent = (float)completion / (float)assetGuids.Count;
 			GUILayout.Label($"{writeStatus}");
@@ -169,14 +173,23 @@ namespace CollabXR
 
 			results.AddRange(FindFilesContainingGuid(files, guid));
 
-			if (results.Count > 0)
+			if(inverseSearch)
 			{
-				file_report += $"guid: {guid} | path: {path}" + Environment.NewLine;
-				file_report += $"  References found: {results.Count}" + Environment.NewLine;
+				if(results.Count == 0)
+				{
+					file_report += $"0 references of guid: {guid} | path: {path}" + Environment.NewLine;
+				}
 			}
-			foreach (string file in results)
+			else
 			{
-				file_report += $"    {file}" + Environment.NewLine;
+				if (results.Count > 0)
+				{
+					file_report += $"{results.Count} references of guid: {guid} | path: {path}" + Environment.NewLine;
+					foreach (string file in results)
+					{
+						file_report += $"    {file}" + Environment.NewLine;
+					}
+				}
 			}
 			if (cts.IsCancellationRequested)
 			{
