@@ -1,16 +1,16 @@
 {
-	"name": "edu.envision.guidreporter",
-	"version": "1.0.0",
-	"displayName": "Unity GUID Reporter",
-	"description": "Unity editor tool for generating bulk dependency reports based on guids.",
-	"unity": "6000.0",
-	"documentationUrl": "https://github.rcac.purdue.edu/EnvisionCenter/CollabXR-Mod-Extras",
-	"dependencies": {
-		"com.cysharp.unitask": "2.5.11"
-	},
-	"author": {
-		"name": "Envision Center",
-		"email": "envision@purdue.edu",
-		"url": "https://envision.center/"
-	}
+  "name": "edu.envision.guidreporter",
+  "version": "1.0.1",
+  "displayName": "Unity GUID Reporter",
+  "description": "Unity editor tool for generating bulk dependency reports based on guids.",
+  "unity": "6000.0",
+  "documentationUrl": "https://github.rcac.purdue.edu/EnvisionCenter/CollabXR-Mod-Extras",
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.11"
+  },
+  "author": {
+    "name": "Envision Center",
+    "email": "envision@purdue.edu",
+    "url": "https://envision.center/"
+  }
 }
